@@ -5,7 +5,7 @@
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
-// the Software without restriction, including without limitation the rights to
+// this Software without restriction, including without limitation the rights to
 // use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 // the Software, and to permit persons to whom the Software is furnished to do so,
 // subject to the following conditions:
@@ -23,15 +23,20 @@
 
 using UnityEngine;
 using System.Collections;
+using UnityEngine.InputSystem.Android.LowLevel;
 
 public class BoidBehaviour : MonoBehaviour
 {
     // Reference to the controller.
+    
+    public float targetInfluence = 0.5f;  // Add this near the top with other public variables
+    Transform sphereTarget;
+
+
     public BoidController controller;
 
     // Options for animation playback.
     public float animationSpeedVariation = 0.2f;
-
     // Random seed.
     float noiseOffset;
 
@@ -43,16 +48,18 @@ public class BoidBehaviour : MonoBehaviour
         var scaler = Mathf.Clamp01(1.0f - diffLen / controller.neighborDist);
         return diff * (scaler / diffLen);
     }
-
     void Start()
     {
         noiseOffset = Random.value * 10.0f;
+
+        sphereTarget = GameObject.FindWithTag("sphereTarget").transform;
+        GameObject GameController = GameObject.FindWithTag("GameController");
+        controller = GameController.GetComponent<BoidController>();
 
         var animator = GetComponent<Animator>();
         if (animator)
             animator.speed = Random.Range(-1.0f, 1.0f) * animationSpeedVariation + 1.0f;
     }
-
     void Update()
     {
         var currentPosition = transform.position;
@@ -66,6 +73,13 @@ public class BoidBehaviour : MonoBehaviour
         var separation = Vector3.zero;
         var alignment = controller.transform.forward;
         var cohesion = controller.transform.position;
+        
+        // Modify the target seeking behavior section
+        var targetDirection = Vector3.zero;
+        if (sphereTarget != null)
+        {
+            targetDirection = (sphereTarget.position - currentPosition).normalized;
+        }
 
         // Looks up nearby boids.
         var nearbyBoids = Physics.OverlapSphere(currentPosition, controller.neighborDist, controller.searchLayer);
@@ -85,8 +99,12 @@ public class BoidBehaviour : MonoBehaviour
         cohesion *= avg;
         cohesion = (cohesion - currentPosition).normalized;
 
-        // Calculates a rotation from the vectors.
+        // Calculates a rotation from the vectors, including target influence
         var direction = separation + alignment + cohesion;
+        if (sphereTarget != null)
+        {
+            direction = (direction + targetDirection * targetInfluence).normalized;
+        }
         var rotation = Quaternion.FromToRotation(Vector3.forward, direction.normalized);
 
         // Applys the rotation with interpolation.
